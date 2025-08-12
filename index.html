@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Chat Bot MCP</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      #chat { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; }
+      #input { width: 100%; padding: 10px; }
+      button { padding: 10px 20px; margin-top: 10px; }
+      .message { margin-bottom: 10px; }
+      .user { color: blue; }
+      .bot { color: green; }
+    </style>
+  </head>
+  <body>
+    <h2>ChatBot</h2>
+    <div id="chat"></div>
+    <input type="text" id="input" placeholder="Type your prompt here" />
+    <button id="send">Send</button>
+
+    <script>
+      const { ipcRenderer } = require('electron')
+      const chat = document.getElementById('chat')
+      const input = document.getElementById('input')
+      const send = document.getElementById('send')
+
+      function appendMessage(text, cls) {
+        const div = document.createElement('div')
+        div.textContent = text
+        div.className = 'message ' + cls
+        chat.appendChild(div)
+        chat.scrollTop = chat.scrollHeight
+      }
+
+      send.onclick = async () => {
+        const userInput = input.value.trim()
+        if (!userInput) return
+
+        appendMessage('You: ' + userInput, 'user')
+        appendMessage('Llama is thinking...', 'bot')
+        input.value = ''
+
+        try {
+          // If you want to send through MCP protocol:
+          // const res = await ipcRenderer.invoke('send-mcp', userInput)
+          // if (res.status !== 'sent') {
+          //   appendMessage('Error: ' + res.message, 'bot')
+          // }
+
+          // Or if you want to invoke llama-cli directly:
+          // Format prompt to avoid echoing user input:
+          const formattedPrompt = `Q: ${userInput}\nA:`
+
+          const response = await ipcRenderer.invoke('run-llama', formattedPrompt)
+          // Replace the "Llama is thinking..." message with actual response
+          const botMessages = document.getElementsByClassName('bot')
+          if (botMessages.length > 0) {
+            botMessages[botMessages.length - 1].textContent = 'Llama: ' + response.trim()
+          }
+        } catch (err) {
+          const botMessages = document.getElementsByClassName('bot')
+          if (botMessages.length > 0) {
+            botMessages[botMessages.length - 1].textContent = 'Error: ' + err.message
+          }
+        }
+      }
+
+      // Listen for MCP messages (if using MCP protocol)
+      ipcRenderer.on('mcp-message', (event, msg) => {
+        if (msg.type === 'chat_response') {
+          appendMessage('Llama: ' + msg.content, 'bot')
+        } else if (msg.type === 'error') {
+          appendMessage('Error from MCP server: ' + msg.content, 'bot')
+        }
+      })
+    </script>
+  </body>
+</html>
